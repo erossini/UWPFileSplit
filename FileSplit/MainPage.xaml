@@ -1,0 +1,14 @@
+﻿<Page
+    x:Class="FileSplit.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:FileSplit"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Height="400" Width="600">
+
+    <Grid>
+        <Button x:Name="btnSplit" Content="Split file by columns" Click="btnSplit_Click" />
+    </Grid>
+</Page>
