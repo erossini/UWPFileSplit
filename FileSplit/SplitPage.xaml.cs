@@ -2,11 +2,15 @@
 using PSC.UWP.Common.CustomEventArgs;
 using System;
 using System.Collections.Generic;
+using Windows.ApplicationModel.Core;
 using Windows.Storage;
 using Windows.Storage.AccessCache;
 using Windows.Storage.Pickers;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+
+// The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=234238
 
 namespace FileSplit
 {
@@ -21,8 +25,12 @@ namespace FileSplit
         {
             this.InitializeComponent();
 
-            vm = new SplitPageViewModel(this.Dispatcher);
+            vm = new SplitPageViewModel();
             DataContext = vm;
+
+            this.firstStep.Visibility = Visibility.Visible;
+            this.secondStep.Visibility = Visibility.Collapsed;
+            this.thirdStep.Visibility = Visibility.Collapsed;
         }
 
         public async void btnBrowse_Click(object sender, RoutedEventArgs e)
@@ -40,6 +48,36 @@ namespace FileSplit
                 StorageApplicationPermissions.FutureAccessList.AddOrReplace("PickedFileToken", file);
 
                 vm.FileName = file.Path;
+                this.btnNext.IsEnabled = true;
+            }
+            else
+            {
+                this.btnNext.IsEnabled = false;
+            }
+        }
+
+        private async void btnNext_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.btnBrowse.IsEnabled)
+            {
+                var dispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+                await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    this.firstStep.Visibility = Visibility.Collapsed;
+                    this.secondStep.Visibility = Visibility.Visible;
+                });
+            
+
+                await vm.DecodeFile();
+
+               
+                await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    this.secondStep.Visibility = Visibility.Collapsed;
+                    this.thirdStep.Visibility = Visibility.Visible;
+                });
+
+             
             }
         }
 
@@ -56,7 +94,6 @@ namespace FileSplit
                 // (including other sub-folder contents)
                 Windows.Storage.AccessCache.StorageApplicationPermissions.
                     FutureAccessList.AddOrReplace("PickedFolderToken", folder);
-
                 vm.Folder = folder.Path;
             }
         }

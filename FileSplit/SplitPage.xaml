@@ -15,8 +15,7 @@
             <RowDefinition Height="35"/>
         </Grid.RowDefinitions>
 
-        <Grid x:Name="firstStep" Margin="30" ColumnSpacing="15" RowSpacing="15" 
-              Visibility="{x:Bind Path=vm.IsStep1Visible, Mode=OneWay}">
+        <Grid x:Name="firstStep" Margin="30" ColumnSpacing="15" RowSpacing="15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="400"/>
                 <ColumnDefinition Width="100"/>
@@ -45,8 +44,7 @@
                      Text="{x:Bind Path=vm.BaseFileName, Mode=TwoWay}"/>
         </Grid>
 
-        <Grid x:Name="secondStep" Margin="30" ColumnSpacing="15"
-              Visibility="{x:Bind Path=vm.IsStep2Visible, Mode=OneWay}">
+        <Grid x:Name="secondStep" Margin="30" ColumnSpacing="15" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
@@ -55,15 +53,11 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock x:Name="textBlockInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                       Text="{x:Bind Path=vm.Message, Mode=OneWay}"/>
-            <ProgressBar x:Name="progressInfo" Height="15" Grid.Row="1" 
-                         Maximum="{x:Bind Path=vm.TotalRows, Mode=OneWay}"
-                         Value="{x:Bind Path=vm.CurrentRow, Mode=OneWay}"/>
+            <TextBlock x:Name="textBlockInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom" />
+            <ProgressBar x:Name="progressInfo" Height="15" Grid.Row="1"  Value="{x:Bind vm.Progress,Mode=OneWay}"/>
         </Grid>
 
-        <Grid x:Name="thirdStep" Margin="30" ColumnSpacing="15"
-              Visibility="{x:Bind Path=vm.IsStep3Visible, Mode=OneWay}">
+        <Grid x:Name="thirdStep" Margin="30" ColumnSpacing="15" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -105,8 +99,6 @@
             </ListView>
         </Grid>
         
-        <Button x:Name="btnNext" Content="Next" Grid.Column="1" Grid.Row="1" 
-                HorizontalAlignment="Right" VerticalAlignment="Top"
-                Command="{x:Bind Path=vm.NextCommand}" />
+        <Button x:Name="btnNext" Content="Next" Grid.Column="1" Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Top" IsEnabled="false" Click="btnNext_Click"/>
     </Grid>
 </Page>

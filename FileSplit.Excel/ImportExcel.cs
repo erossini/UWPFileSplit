@@ -13,7 +13,9 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.Core;
 using Windows.Storage;
+using Windows.UI.Core;
 
 namespace FileSplit.Excel
 {
@@ -26,12 +28,15 @@ namespace FileSplit.Excel
         public event EventHandler<ReadErrorEventArgs> ReadError;
         public event EventHandler<ReadHeaderEventArgs> ReadHeader;
         public event EventHandler<UpdatedRowEventArgs> UpdatedRow;
-
-        protected virtual void OnReadCompleted(ReadCompletedEventArgs e)
+        private CoreDispatcher dispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+        protected async virtual void OnReadCompleted(ReadCompletedEventArgs e)
         {
-            EventHandler<ReadCompletedEventArgs> handler = ReadCompleted;
-            if (handler != null) handler(this, e);
-
+            EventHandler<ReadCompletedEventArgs> handler = ReadCompleted;           
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (handler != null) handler(this, e);
+            });
+         
             Debug.WriteLine($"Read completed");
         }
 
@@ -51,11 +56,16 @@ namespace FileSplit.Excel
             Debug.WriteLine($"Header has been read. It contains {e.HeaderNumber} columns");
         }
 
-        protected virtual void OnUpdatedRow(UpdatedRowEventArgs e)
+        protected async virtual void OnUpdatedRow(UpdatedRowEventArgs e)
         {
             EventHandler<UpdatedRowEventArgs> handler = UpdatedRow;
-            if (handler != null) handler(this, e);
 
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (handler != null) handler(this, e);
+            });
+
+          
             Debug.WriteLine($"Read record {e.CurrentRow}/{e.TotalRows}");
         }
 
@@ -97,93 +107,97 @@ namespace FileSplit.Excel
         /// <returns>DataGrid.</returns>
         public async Task<DataGrid> ReadToGrid(string filePath)
         {
-            var grid = new DataGrid();
-            grid.Success = true;
-
-            try
+            return await Task.Run(async () =>
             {
-                StorageFile fl = await StorageFile.GetFileFromPathAsync(filePath);
-                SafeFileHandle fileHandle = fl.CreateSafeFileHandle(FileAccess.Read, FileShare.ReadWrite);
+                var grid = new DataGrid();
+                grid.Success = true;
 
-                using (FileStream fs = new FileStream(fileHandle, FileAccess.Read))
+                try
                 {
-                    var document = SpreadsheetDocument.Open(fs, false);
-                    var sharedStringTable = document.WorkbookPart.SharedStringTablePart.SharedStringTable;
-                    var value = string.Empty;
+                    StorageFile fl = await StorageFile.GetFileFromPathAsync(filePath);
+                    SafeFileHandle fileHandle = fl.CreateSafeFileHandle(FileAccess.Read, FileShare.ReadWrite);
 
-                    bool isheader = true;
-                    foreach (var worksheetPart in document.WorkbookPart.WorksheetParts)
+                    using (FileStream fs = new FileStream(fileHandle, FileAccess.Read))
                     {
-                        foreach (var sheetData in worksheetPart.Worksheet.Elements<SheetData>())
+                        var document = SpreadsheetDocument.Open(fs, false);
+                        var sharedStringTable = document.WorkbookPart.SharedStringTablePart.SharedStringTable;
+                        var value = string.Empty;
+
+                        bool isheader = true;
+                        foreach (var worksheetPart in document.WorkbookPart.WorksheetParts)
                         {
-                            if (sheetData.HasChildren)
+                            foreach (var sheetData in worksheetPart.Worksheet.Elements<SheetData>())
                             {
-                                int totalRows = sheetData.Elements<Row>().Count();
-                                UpdateRowEvent(0, totalRows);
-
-                                int currentRow = 0;
-                                foreach (var row in sheetData.Elements<Row>())
+                                if (sheetData.HasChildren)
                                 {
-                                    int columnIndex = 0;
-                                    var dictionary = new Dictionary<string, string>();
+                                    int totalRows = sheetData.Elements<Row>().Count();
+                                    UpdateRowEvent(0, totalRows);
 
-                                    foreach (var cell in row.Elements<Cell>())
+                                    int currentRow = 0;
+                                    foreach (var row in sheetData.Elements<Row>())
                                     {
-                                        value = cell.InnerText;
+                                        int columnIndex = 0;
+                                        var dictionary = new Dictionary<string, string>();
 
-                                        if (value != null && cell.DataType != null && cell.DataType == CellValues.SharedString)
-                                            value = sharedStringTable.ElementAt(int.Parse(value)).InnerText;
-
-                                        if (isheader)
+                                        foreach (var cell in row.Elements<Cell>())
                                         {
-                                            grid.Headers.Add(value);
+                                            value = cell.InnerText;
+
+                                            if (value != null && cell.DataType != null && cell.DataType == CellValues.SharedString)
+                                                value = sharedStringTable.ElementAt(int.Parse(value)).InnerText;
+
+                                            if (isheader)
+                                            {
+                                                grid.Headers.Add(value);
+                                            }
+                                            else
+                                            {
+                                                int cellRef = CellReferenceToIndex(cell);
+                                                var header = grid.Headers[cellRef];
+                                                dictionary.Add(header, value);
+                                            }
+
+                                            columnIndex++;
+                                        }
+
+                                        if (!isheader)
+                                        {
+                                            currentRow++;
+                                            grid.Rows.Add(dictionary);
+                                            UpdateRowEvent(currentRow, totalRows);
                                         }
                                         else
                                         {
-                                            int cellRef = CellReferenceToIndex(cell);
-                                            var header = grid.Headers[cellRef];
-                                            dictionary.Add(header, value);
+                                            ReadHeaderEventArgs args = new ReadHeaderEventArgs();
+                                            args.HeaderNumber = columnIndex;
+                                            OnReadHeader(args);
                                         }
 
-                                        columnIndex++;
+                                        isheader = false;
                                     }
-
-                                    currentRow++;
-                                    if (!isheader)
-                                    {
-                                        grid.Rows.Add(dictionary);
-                                        UpdateRowEvent(currentRow, totalRows);
-                                    }
-                                    else
-                                    {
-                                        ReadHeaderEventArgs args = new ReadHeaderEventArgs();
-                                        args.HeaderNumber = columnIndex;
-                                        OnReadHeader(args);
-                                    }
-
-                                    isheader = false;
                                 }
                             }
                         }
+
+                        document.Close();
                     }
-
-                    document.Close();
                 }
-            }
-            catch(Exception ex)
-            {
-                ReadErrorEventArgs errArgs = new ReadErrorEventArgs();
-                errArgs.Message = ex.Message;
-                OnReadError(errArgs);
-            }
+                catch (Exception ex)
+                {
+                    ReadErrorEventArgs errArgs = new ReadErrorEventArgs();
+                    errArgs.Message = ex.Message;
+                    OnReadError(errArgs);
+                }
 
-            grid = CheckGrid(grid);
+                grid = CheckGrid(grid);
 
-            ReadCompletedEventArgs readArgs = new ReadCompletedEventArgs();
-            readArgs.DataGrid = grid;
-            OnReadCompleted(readArgs);
+                ReadCompletedEventArgs readArgs = new ReadCompletedEventArgs();
+                readArgs.DataGrid = grid;
+                OnReadCompleted(readArgs);
 
-            return grid;
+                return grid;
+            });
+        
         }
 
         /// <summary>
