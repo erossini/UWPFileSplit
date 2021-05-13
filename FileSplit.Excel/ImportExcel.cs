@@ -148,9 +148,9 @@ namespace FileSplit.Excel
                                         columnIndex++;
                                     }
 
+                                    currentRow++;
                                     if (!isheader)
                                     {
-                                        currentRow++;
                                         grid.Rows.Add(dictionary);
                                         UpdateRowEvent(currentRow, totalRows);
                                     }

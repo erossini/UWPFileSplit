@@ -27,10 +27,14 @@ namespace FileSplit.ViewModels
         public ObservableCollection<ListItemData> ListItemLeft { get; set; } = new ObservableCollection<ListItemData>();
         public ObservableCollection<ListItemData> ListItemRight { get; set; } = new ObservableCollection<ListItemData>();
 
-        public SplitPageViewModel()
+        CoreDispatcher dispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+
+        public SplitPageViewModel(Windows.UI.Core.CoreDispatcher dispatcher)
         {
+
             MoveLeftCommand = new RelayCommand(new Action(MoveLeft), CanExecuteMoveLeftCommand);
             MoveRightCommand = new RelayCommand(new Action(MoveRight), CanExecuteMoveRightCommand);
+            NextCommand = new RelayCommand(new Action(NextAction), CanExecuteNextCommand);
         }
 
         #region Properties
@@ -44,6 +48,48 @@ namespace FileSplit.ViewModels
                 {
                     _baseFileName = value;
                     OnPropertyChanged(nameof(BaseFileName));
+                }
+            }
+        }
+
+        private Visibility _isStep1Visible = Visibility.Visible;
+        public Visibility IsStep1Visible
+        {
+            get { return _isStep1Visible; } 
+            set
+            {
+                if(_isStep1Visible != value)
+                {
+                    _isStep1Visible = value;
+                    OnPropertyChanged(nameof(IsStep1Visible));
+                }
+            }
+        }
+
+        private Visibility _isStep2Visible = Visibility.Collapsed;
+        public Visibility IsStep2Visible
+        {
+            get { return _isStep2Visible; }
+            set
+            {
+                if (_isStep2Visible != value)
+                {
+                    _isStep2Visible = value;
+                    OnPropertyChanged(nameof(IsStep2Visible));
+                }
+            }
+        }
+
+        private Visibility _isStep3Visible = Visibility.Collapsed;
+        public Visibility IsStep3Visible
+        {
+            get { return _isStep3Visible; }
+            set
+            {
+                if (_isStep3Visible != value)
+                {
+                    _isStep3Visible = value;
+                    OnPropertyChanged(nameof(IsStep3Visible));
                 }
             }
         }
@@ -104,6 +150,7 @@ namespace FileSplit.ViewModels
                 {
                     _filename = value;
                     OnPropertyChanged(nameof(FileName));
+                    NextCommand.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -119,6 +166,7 @@ namespace FileSplit.ViewModels
                 {
                     _folder = value;
                     OnPropertyChanged(nameof(Folder));
+                    NextCommand.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -172,10 +220,15 @@ namespace FileSplit.ViewModels
         #region PropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
 
-        protected void OnPropertyChanged(string propertyName)
+        protected async void OnPropertyChanged(string propertyName)
         {
             PropertyChangedEventArgs e = new PropertyChangedEventArgs(propertyName);
-            this.PropertyChanged?.Invoke(this, e);
+
+            await dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
+            {
+                PropertyChanged?.Invoke(this,
+                        new PropertyChangedEventArgs(propertyName));
+            });
         }
         #endregion
 
@@ -183,23 +236,23 @@ namespace FileSplit.ViewModels
 
         public async Task DecodeFile()
         {
-            await Task.Run(async () =>
-            {
-                ImportExcel excel = new ImportExcel();
-                excel.ReadCompleted += Excel_ReadCompleted;
-                excel.ReadHeader += Excel_ReadHeader;
-                excel.UpdatedRow += Excel_UpdatedRow;
+            ImportExcel excel = new ImportExcel();
+            excel.ReadCompleted += Excel_ReadCompleted;
+            excel.ReadHeader += Excel_ReadHeader;
+            excel.UpdatedRow += Excel_UpdatedRow;
 
-                await excel.ReadToGrid(FileName);
-            });
+            await excel.ReadToGrid(FileName);
         }
 
-        private void Excel_ReadCompleted(object sender, Excel.CustomEventArgs.ReadCompletedEventArgs e)
+        private async void Excel_ReadCompleted(object sender, Excel.CustomEventArgs.ReadCompletedEventArgs e)
         {
             grid = e.DataGrid;
 
-            for (int i = 0; i < e.DataGrid.Headers.Count; i++)
-                ListItemLeft.Add(new ListItemData() { Index = i, ListItemText = e.DataGrid.Headers[i] });
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                for (int i = 0; i < e.DataGrid.Headers.Count; i++)
+                    ListItemLeft.Add(new ListItemData() { Index = i, ListItemText = e.DataGrid.Headers[i] });
+            });
 
             OnPropertyChanged(nameof(ListItemLeft));
             MoveRightCommand.RaiseCanExecuteChanged();
@@ -212,7 +265,7 @@ namespace FileSplit.ViewModels
             await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 Message = e.CurrentRow == 0 ? $"Starting to read all {e.TotalRows} records..." :
-                                              $"Read record {e.CurrentRow}/{e.TotalRows}";
+                                            $"Read record {e.CurrentRow}/{e.TotalRows}";
                 CurrentRow = e.CurrentRow;
                 TotalRows = e.TotalRows;
             });
@@ -233,6 +286,7 @@ namespace FileSplit.ViewModels
 
         public RelayCommand MoveLeftCommand { get; private set; }
         public RelayCommand MoveRightCommand { get; private set; }
+        public RelayCommand NextCommand { get; private set; }
 
         /// <summary>
         /// Move left command valid when items present in the list on right.
@@ -250,6 +304,11 @@ namespace FileSplit.ViewModels
         private bool CanExecuteMoveRightCommand()
         {
             return ListItemLeft.Count > 0;
+        }
+
+        private bool CanExecuteNextCommand()
+        {
+            return !string.IsNullOrEmpty(FileName) && !string.IsNullOrEmpty(Folder);
         }
 
         public void MoveRight()
@@ -303,6 +362,17 @@ namespace FileSplit.ViewModels
                 MoveRightCommand.RaiseCanExecuteChanged();
                 MoveLeftCommand.RaiseCanExecuteChanged();
             }
+        }
+
+        public async void NextAction()
+        {
+            IsStep1Visible = Visibility.Collapsed;
+            IsStep2Visible = Visibility.Visible;
+
+            await Task.Run(async () => await DecodeFile());
+
+            IsStep2Visible = Visibility.Collapsed;
+            IsStep3Visible = Visibility.Visible;
         }
 
         #endregion Commands

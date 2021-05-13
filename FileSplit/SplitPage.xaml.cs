@@ -8,8 +8,6 @@ using Windows.Storage.Pickers;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-// The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=234238
-
 namespace FileSplit
 {
     /// <summary>
@@ -23,12 +21,8 @@ namespace FileSplit
         {
             this.InitializeComponent();
 
-            vm = new SplitPageViewModel();
+            vm = new SplitPageViewModel(this.Dispatcher);
             DataContext = vm;
-
-            this.firstStep.Visibility = Visibility.Visible;
-            this.secondStep.Visibility = Visibility.Collapsed;
-            this.thirdStep.Visibility = Visibility.Collapsed;
         }
 
         public async void btnBrowse_Click(object sender, RoutedEventArgs e)
@@ -46,25 +40,6 @@ namespace FileSplit
                 StorageApplicationPermissions.FutureAccessList.AddOrReplace("PickedFileToken", file);
 
                 vm.FileName = file.Path;
-                this.btnNext.IsEnabled = true;
-            }
-            else
-            {
-                this.btnNext.IsEnabled = false;
-            }
-        }
-
-        private async void btnNext_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.btnBrowse.IsEnabled)
-            {
-                this.firstStep.Visibility = Visibility.Collapsed;
-                this.secondStep.Visibility = Visibility.Visible;
-
-                await vm.DecodeFile();
-
-                this.secondStep.Visibility = Visibility.Collapsed;
-                this.thirdStep.Visibility = Visibility.Visible;
             }
         }
 
@@ -81,6 +56,7 @@ namespace FileSplit
                 // (including other sub-folder contents)
                 Windows.Storage.AccessCache.StorageApplicationPermissions.
                     FutureAccessList.AddOrReplace("PickedFolderToken", folder);
+
                 vm.Folder = folder.Path;
             }
         }
