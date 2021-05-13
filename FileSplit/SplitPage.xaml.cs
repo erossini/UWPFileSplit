@@ -23,7 +23,7 @@ namespace FileSplit
         {
             this.InitializeComponent();
 
-            vm = new SplitPageViewModel(this.Dispatcher);
+            vm = new SplitPageViewModel();
             DataContext = vm;
 
             this.firstStep.Visibility = Visibility.Visible;
@@ -61,7 +61,7 @@ namespace FileSplit
                 this.firstStep.Visibility = Visibility.Collapsed;
                 this.secondStep.Visibility = Visibility.Visible;
 
-                await vm.ValidateAndStart();
+                await vm.DecodeFile();
 
                 this.secondStep.Visibility = Visibility.Collapsed;
                 this.thirdStep.Visibility = Visibility.Visible;

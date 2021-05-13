@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.Core;
 using Windows.Storage;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -26,18 +27,13 @@ namespace FileSplit.ViewModels
         public ObservableCollection<ListItemData> ListItemLeft { get; set; } = new ObservableCollection<ListItemData>();
         public ObservableCollection<ListItemData> ListItemRight { get; set; } = new ObservableCollection<ListItemData>();
 
-        public SplitPageViewModel(Windows.UI.Core.CoreDispatcher dispatcher)
+        public SplitPageViewModel()
         {
-            _dispatcher = dispatcher;
-
             MoveLeftCommand = new RelayCommand(new Action(MoveLeft), CanExecuteMoveLeftCommand);
             MoveRightCommand = new RelayCommand(new Action(MoveRight), CanExecuteMoveRightCommand);
         }
 
-        #region IContext
-        private readonly Windows.UI.Core.CoreDispatcher _dispatcher;
-        #endregion
-
+        #region Properties
         private string _baseFileName = "output";
         public string BaseFileName
         {
@@ -171,35 +167,31 @@ namespace FileSplit.ViewModels
                 }
             }
         }
+        #endregion
 
+        #region PropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
 
-        protected async void OnPropertyChanged(string propertyName)
+        protected void OnPropertyChanged(string propertyName)
         {
             PropertyChangedEventArgs e = new PropertyChangedEventArgs(propertyName);
-            //this.PropertyChanged?.Invoke(this, e);
-
-            await _dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
-            {
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            });
+            this.PropertyChanged?.Invoke(this, e);
         }
+        #endregion
 
         #region Read Excel
 
-        public async Task ValidateAndStart()
-        {
-            await DecodeFile();
-        }
-
         public async Task DecodeFile()
         {
-            ImportExcel excel = new ImportExcel();
-            excel.ReadCompleted += Excel_ReadCompleted;
-            excel.ReadHeader += Excel_ReadHeader;
-            excel.UpdatedRow += Excel_UpdatedRow;
+            await Task.Run(async () =>
+            {
+                ImportExcel excel = new ImportExcel();
+                excel.ReadCompleted += Excel_ReadCompleted;
+                excel.ReadHeader += Excel_ReadHeader;
+                excel.UpdatedRow += Excel_UpdatedRow;
 
-            await excel.ReadToGrid(FileName);
+                await excel.ReadToGrid(FileName);
+            });
         }
 
         private void Excel_ReadCompleted(object sender, Excel.CustomEventArgs.ReadCompletedEventArgs e)
@@ -214,34 +206,28 @@ namespace FileSplit.ViewModels
             MoveLeftCommand.RaiseCanExecuteChanged();
         }
 
-        private void Excel_UpdatedRow(object sender, UpdatedRowEventArgs e)
+        private async void Excel_UpdatedRow(object sender, UpdatedRowEventArgs e)
         {
-            if (e.CurrentRow == 0)
+            var dispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
-                CurrentRow = 1;
-                TotalRows = e.TotalRows;
-                Message = $"Starting to read all {e.TotalRows} records...";
-            }
-            else
-            {
+                Message = e.CurrentRow == 0 ? $"Starting to read all {e.TotalRows} records..." :
+                                              $"Read record {e.CurrentRow}/{e.TotalRows}";
                 CurrentRow = e.CurrentRow;
-                Message = $"Read record {e.CurrentRow}/{e.TotalRows}";
-            }
+                TotalRows = e.TotalRows;
+            });
         }
 
-        private void Excel_ReadHeader(object sender, Excel.CustomEventArgs.ReadHeaderEventArgs e)
+        private async void Excel_ReadHeader(object sender, Excel.CustomEventArgs.ReadHeaderEventArgs e)
         {
-            Message = $"Header has been read. It contains {e.HeaderNumber} columns";
+            var dispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                Message = $"Header has been read. It contains {e.HeaderNumber} columns";
+            });
         }
 
         #endregion Read Excel
-
-        public event EventHandler<UpdatedRowEventArgs> UpdatedRow;
-        protected virtual void OnUpdatedRow(UpdatedRowEventArgs e)
-        {
-            EventHandler<UpdatedRowEventArgs> handler = UpdatedRow;
-            if (handler != null) handler(this, e);
-        }
 
         #region Commands
 
@@ -321,6 +307,7 @@ namespace FileSplit.ViewModels
 
         #endregion Commands
 
+        #region Export CSV and Excel
         public byte[] ExportData()
         {
             var stream = new MemoryStream();
@@ -434,5 +421,6 @@ namespace FileSplit.ViewModels
             }
             streamCSV.Dispose();
         }
+        #endregion
     }
 }
